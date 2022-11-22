@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+import torch.optim as optim
 from GPG import GeneralizedPG, OffGeneralizedPG
 from ActorCritic import ActorCritic
 from EVFA import ExtendedVFA, OffExtendedVFA
@@ -107,30 +107,29 @@ class GeneralizedAC:
         # print('-----------------Evaling-----------------')
         return scores
 
-    def warm_start(self, num_train=100, batch_size=100, epsilon=0.2):
+    def warm_start(self, num_train=100, batch_size=100, epsilon=0):
         print('*********************warm-start is running***************************')
+        for _ in range(self.buffer_size):
+            epi_buf = EpisodeBuffer()
+            self.env.reset()
+            state = self.env.get_agent_obs_onehot() + [self.time_budget - self.env.cost_time]
+            while True:
+                action, next_state, mask, log_prob, done = self.LET_step(state, eps=epsilon)
+                if self.mode == 'let-ac':
+                    let_cost = self.env.LET_cost[self.env.position - 1]
+                    epi_buf.push(state, action, next_state, self.env.cost_time, mask, log_prob, let_cost)
+                else:
+                    epi_buf.push(state, action, next_state, self.env.cost_time, mask, log_prob, done)
+                state = next_state
+                if done or len(self.env.path) > self.env.map_info.n_node:
+                    break
+            self.buffer.push(epi_buf, self.env.cost_time)
         for _ in tqdm(range(num_train)):
-            for _ in range(batch_size):
-                epi_buf = EpisodeBuffer()
-                self.env.reset()
-                state = self.env.get_agent_obs_onehot() + [self.time_budget - self.env.cost_time]
-                while True:
-                    action, next_state, mask, log_prob, done = self.LET_step(state, eps=epsilon)
-                    if self.mode == 'let-ac':
-                        let_cost = self.env.LET_cost[self.env.position - 1]
-                        epi_buf.push(state, action, next_state, self.env.cost_time, mask, log_prob, let_cost)
-                    else:
-                        epi_buf.push(state, action, next_state, self.env.cost_time, mask, log_prob, done)
-                    state = next_state
-                    if done or len(self.env.path) > self.env.map_info.n_node:
-                        break
-                self.buffer.push(epi_buf, self.env.cost_time)
-
             if self.mode == 'on-policy' or self.mode == 'let-ac':
-                samples = self.buffer.sample(self.buffer_size)
-                self.policy.learn(samples)
+                samples = self.buffer.sample(batch_size)
+                self.policy.learn(samples, now_prob=True)
             if self.mode == 'off-policy':
-                samples, indices, _ = self.buffer.sample(self.buffer_size)
+                samples, indices, _ = self.buffer.sample(batch_size)
                 cur_log_probs = self.policy.get_cur_log_probs(samples)
                 self.policy.learn(samples, critic=self.critic, cur_log_probs=cur_log_probs)
         print('*********************warm-start is finished**************************')
@@ -140,6 +139,7 @@ class GeneralizedAC:
         data_list = []
         label_list = []
         n_node = self.env.map_info.n_node
+        optimizer = optim.Adam(self.policy.policy.parameters(), lr=0.01)
         for i in range(self.env.map_info.n_node):
             self.env.position = i + 1
             if i + 1 == self.env.destination:
@@ -155,10 +155,11 @@ class GeneralizedAC:
             output_tensor = self.policy.policy(data_tensor.detach())
             output_tensor = F.softmax(F.sigmoid(output_tensor), dim=-1)
             loss = F.cross_entropy(output_tensor, label_tensor.detach())
-            self.policy.optimizer.zero_grad()
+            optimizer.zero_grad()
             # loss = torch.concat(loss).mean()
             loss.backward()
-            self.policy.optimizer.step()
+            optimizer.step()
+            # print(loss.item())
         print('*********************warm-start is finished**************************')
 
     def train(self, num_train, batch_size=100, with_eval=False, int_eval=10):

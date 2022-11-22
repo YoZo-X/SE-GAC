@@ -75,8 +75,6 @@ class MapInfo:
     def get_edge_cost(self, edge):
         mu = self.G.get_edge_data(edge[0] - 1, edge[1] - 1)[0]["mu"]
         sigma2 = self.G.get_edge_data(edge[0] - 1, edge[1] - 1)[0]["sigma2"]
-        # mu = self.mu[edge_idx]
-        # sigma2 = self.sigma2[edge_idx]
         cost = np.random.normal(mu, np.sqrt(sigma2))
         return cost
 

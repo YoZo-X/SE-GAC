@@ -32,13 +32,20 @@ class GeneralizedPG(nn.Module):
         log_prob = m.log_prob(action.view(-1) - 1)
         return log_prob
 
-    def learn(self, episodes, critic=None, **kwargs):
+    def learn(self, episodes, critic=None, now_prob=False, **kwargs):
         policy_loss = []
         for episode, travel_time in episodes:
             bp = 0
             seq_len = len(episode)
             batch = episode.sample()
-            log_prob_tensor = torch.clone(torch.cat(batch.prob).view(seq_len, -1)).to(self.device)
+            if now_prob:
+                state_tensor = torch.FloatTensor(np.array(batch.state)).view(seq_len, -1).to(self.device)
+                actoin_tensor = torch.FloatTensor(np.array(batch.action)).view(seq_len, -1).to(self.device)
+                mask_tensor = torch.FloatTensor(np.array(batch.mask)).view(seq_len, -1).to(self.device)
+                log_prob_tensor = self.get_log_prob(state_tensor.detach(), mask_tensor.detach(),
+                                                    actoin_tensor.detach()).view(seq_len, -1)
+            else:
+                log_prob_tensor = torch.clone(torch.cat(batch.prob).view(seq_len, -1)).to(self.device)
             o_state_tensor = torch.FloatTensor(np.array(batch.state[0])).view(1, -1).to(self.device)
             if critic:
                 bp = critic.model(o_state_tensor)
