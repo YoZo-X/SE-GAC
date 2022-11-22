@@ -19,7 +19,7 @@ if __name__ == '__main__':
     GPG.WITH_WIS = False
     EVFA.WITH_VARCON = False
     gac = GeneralizedAC(env1, time_budget=T, buffer_size=100, mode='on-policy', with_critic=True, device='cpu')
-    gac.warm_start(100, epsilon=0.2)
+    gac.supervised_warm_start(10000)
     pi_score = gac.train(num_train=100, batch_size=100, with_eval=False, int_eval=1)
     print(gac.eval(1, 1000))
 

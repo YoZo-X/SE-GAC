@@ -26,6 +26,7 @@ def gp3_query(mymap, k, OD, T):
 
 if __name__ == '__main__':
     map1 = MapInfo("maps/sioux_network.csv")
-    print(gp3_query(map1, 100, [1, 15], 43))
+    path, prob = gp3_query(map1, 100, [1, 15], 43)
+    map1.get_sample_time(path)
 
 

@@ -54,7 +54,7 @@ class MapInfo:
     def get_sample_time(self, path):
         total_cost = 0
         for i in range(len(path) - 1):
-            cost = self.get_edge_cost(path[i], path[i + 1])
+            cost = self.get_edge_cost([path[i], path[i + 1]])
             total_cost += cost
         return total_cost
 
