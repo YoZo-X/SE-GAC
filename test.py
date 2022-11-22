@@ -11,15 +11,16 @@ if __name__ == '__main__':
     torch.manual_seed(808)
     torch.cuda.manual_seed(808)
 
-    map1 = MapInfo("maps/sioux_network.csv")
+    map1 = MapInfo("maps/Weekday_Peak_network.csv")
     env1 = Env(map1, 1, 15)
 
     # OP-GAC
-    T = 39
+    T = env1.LET_cost[0]
     GPG.WITH_WIS = False
     EVFA.WITH_VARCON = False
-    gac = GeneralizedAC(env1, time_budget=T, buffer_size=100, mode='on-policy', with_critic=True, device='cpu')
+    gac = GeneralizedAC(env1, time_budget=T, buffer_size=100, mode='on-policy', with_critic=True, device='cuda:0')
     gac.supervised_warm_start(10000)
+    # gac.warm_start(10)
     pi_score = gac.train(num_train=100, batch_size=100, with_eval=False, int_eval=1)
     print(gac.eval(1, 1000))
 

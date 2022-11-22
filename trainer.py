@@ -137,23 +137,24 @@ class GeneralizedAC:
 
     def supervised_warm_start(self, num_train=100):
         print('*********************warm-start is running***************************')
+        data_list = []
+        label_list = []
+        n_node = self.env.map_info.n_node
+        for i in range(self.env.map_info.n_node):
+            self.env.position = i + 1
+            if i + 1 == self.env.destination:
+                continue
+            state = torch.FloatTensor(self.env.get_agent_obs_onehot() + [self.env.LET_cost[i] * random.random()]).to(
+                self.device)
+            label = torch.LongTensor([self.env.LET_path[i][1] - 1]).to(self.device)
+            data_list.append(state)
+            label_list.append(label)
+        data_tensor = torch.concat(data_list).view(n_node - 1, -1)
+        label_tensor = torch.concat(label_list).view(-1)
         for _ in tqdm(range(num_train)):
-            data_tensor = []
-            label_tensor = []
-            n_node = self.env.map_info.n_node
-            for i in range(self.env.map_info.n_node):
-                self.env.position = i + 1
-                if i + 1 == self.env.destination:
-                    continue
-                state = torch.FloatTensor(self.env.get_agent_obs_onehot() + [self.env.LET_cost[i] * random.random()]).to(self.device)
-                label = torch.LongTensor([self.env.LET_path[i][1] - 1]).to(self.device)
-                data_tensor.append(state)
-                label_tensor.append(label)
-            data_tensor = torch.concat(data_tensor).view(n_node-1, -1)
-            label_tensor = torch.concat(label_tensor).view(-1)
-            output_tensor = self.policy.policy(data_tensor)
+            output_tensor = self.policy.policy(data_tensor.detach())
             output_tensor = F.softmax(F.sigmoid(output_tensor), dim=-1)
-            loss = F.cross_entropy(output_tensor, label_tensor)
+            loss = F.cross_entropy(output_tensor, label_tensor.detach())
             self.policy.optimizer.zero_grad()
             # loss = torch.concat(loss).mean()
             loss.backward()
