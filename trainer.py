@@ -63,6 +63,8 @@ class GeneralizedAC:
         mask = self.env.get_agent_mask()
         mask_tensor = torch.FloatTensor(mask).to(self.device)
         action, log_prob = self.policy.select_action(state_tensor.unsqueeze(0), mask_tensor)
+        if action in self.env.path:
+            return self.LET_step(state)
         _, cost, done = self.env.step(action)
         next_state = self.env.get_agent_obs_onehot() + [self.time_budget - self.env.cost_time]
         return action, next_state, mask, log_prob, done

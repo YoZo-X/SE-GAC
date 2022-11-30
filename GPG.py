@@ -35,7 +35,7 @@ class GeneralizedPG(nn.Module):
     def learn(self, episodes, critic=None, now_prob=False, **kwargs):
         policy_loss = []
         for episode, travel_time in episodes:
-            bp = 0
+            bp = 0.1
             seq_len = len(episode)
             batch = episode.sample()
             if now_prob:
@@ -53,8 +53,7 @@ class GeneralizedPG(nn.Module):
 
             err_time = torch.FloatTensor([self.time_budget - travel_time]).to(self.device)
             R = (err_time > 0) * 1 - bp
-            # R = (torch.sigmoid(err_time) - bp)
-            # R = (remain_time_tensor - remain_time_tensor.mean()) / (remain_time_tensor.std() + 10e-6)
+            # R = (torch.sigmoid(err_time) - bp) if err_time < 0 else torch.FloatTensor([1]).to(self.device)
             policy_loss.append((-log_prob_tensor * R.detach()).sum().view(1, -1))
 
         self.optimizer.zero_grad()
@@ -99,7 +98,7 @@ class OffGeneralizedPG(GeneralizedPG):
     def learn(self, episodes, critic=None, **kwargs):
         policy_loss = []
         for (episode, travel_time), cur_log_prob in zip(episodes, kwargs['cur_log_probs']):
-            bp = 0
+            bp = 0.1
             seq_len = len(episode)
             batch = episode.sample()
 
@@ -115,7 +114,8 @@ class OffGeneralizedPG(GeneralizedPG):
                 bp = 0.1 if bp < 0.1 else bp
 
             err_time = torch.FloatTensor([self.time_budget - travel_time]).to(self.device)
-            R = (torch.sigmoid(err_time) - bp)
+            R = (err_time > 0) * 1 - bp
+            # R = (torch.sigmoid(err_time) - bp) if err_time < 0 else torch.FloatTensor([1]).to(self.device)
             policy_loss.append((-cur_log_prob * R.detach() * rau.detach()).sum().view(1, -1))
 
         self.optimizer.zero_grad()

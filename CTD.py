@@ -1,3 +1,5 @@
+import random
+
 from utils.cutom_env import *
 from scipy.stats import norm
 
@@ -29,17 +31,17 @@ class CTD:
         self.mu_table = [[random.random() * 10] * n_node for _ in range(n_node)]
         self.sigma2_table = [[random.random()] * n_node for _ in range(n_node)]
 
-    def select_action(self, location, travel_time, exp=0.):
+    def select_action(self, location, travel_time):
         next_nodes = self.map_info.get_next_nodes(location)
-        if random.random() > exp:
-            # mus = np.array([self.map_info.G.get_edge_data(location-1, n-1)[0]["mu"] for n in next_nodes])
-            mus = np.array([self.mu_table[location - 1][n - 1] for n in next_nodes])
-            sigmas = np.sqrt([self.sigma2_table[location - 1][n - 1] for n in next_nodes])
-            probs = norm(mus, sigmas).cdf(self.time_budget - travel_time)
-            idx = np.argmax(probs)
-            action = next_nodes[idx]
-        else:
-            action = random.choice(next_nodes)
+        # if random.random() > exp:
+        # mus = np.array([self.map_info.G.get_edge_data(location-1, n-1)[0]["mu"] for n in next_nodes])
+        mus = np.array([self.mu_table[location - 1][n - 1] for n in next_nodes])
+        sigmas = np.sqrt([self.sigma2_table[location - 1][n - 1] for n in next_nodes])
+        probs = norm(mus, sigmas).cdf(self.time_budget - travel_time)
+        idx = np.argmax(probs)
+        action = next_nodes[idx]
+        # else:
+        #     action = random.choice(next_nodes)
         return int(action)
 
     def update(self, state, action, done, lr=0.1, **kwargs):
@@ -50,7 +52,7 @@ class CTD:
         if not done:
             state_mu = self.mu_table[state - 1][action - 1]
             state_sigma2 = self.sigma2_table[state - 1][action - 1]
-            next_action = self.select_action(next_state, travel_time, exp=0)
+            next_action = self.select_action(next_state, travel_time)
             next_state_mu = self.mu_table[next_state - 1][next_action - 1]
             next_state_sigma2 = self.sigma2_table[next_state - 1][next_action - 1]
             self.mu_table[state - 1][action - 1] = lr * (action_mu + next_state_mu) + (1 - lr) * \
@@ -89,7 +91,15 @@ class Trainer:
     #     self.policy.sigma2_table = check_point['sigma2']
 
     def step(self, state, exp=0):
-        action = self.policy.select_action(state, self.env.cost_time, exp)
+        next_nodes = self.env.map_info.get_next_nodes(self.env.position)
+        if random.random() > exp:
+            if random.random() > exp:
+                action = self.policy.select_action(state, self.env.cost_time)
+            else:
+                action = random.choice(next_nodes)
+        else:
+            action = self.env.LET_path[self.env.position - 1][1]
+
         _, cost, done = self.env.step(action)
         next_state = self.env.position
         return action, next_state, cost, done
@@ -149,6 +159,6 @@ class Trainer:
 if __name__ == '__main__':
     map1 = MapInfo("maps/sioux_network.csv")
     env1 = Env(map1, 1, 15)
-    ctd = Trainer(env1, policy=CTD, time_budget=39)
-    pi_score = ctd.train(num_train=1000, with_eval=False, int_eval=1)
+    ctd = Trainer(env1, policy=CTD, time_budget=39, min_eps=0, max_eps=0)
+    pi_score = ctd.train(num_train=10000, with_eval=False, int_eval=1)
     ctd.eval(1000)
